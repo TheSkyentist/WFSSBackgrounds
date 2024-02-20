@@ -1,0 +1,6 @@
+# Exclud downloaded directories and files
+GR*/
+wfssbackgrounds/
+
+# Exclude comparison script
+compare*
