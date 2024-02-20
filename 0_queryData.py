@@ -19,7 +19,7 @@ from astropy.coordinates import SkyCoord
 all_obs = Observations.query_criteria(instrument_name="NIRISS/WFSS",obs_collection="JWST",dataRights="PUBLIC",intentType='science')
 all_obs = all_obs[np.unique(all_obs['obs_id'],return_index=True)[1]]
 
-# Limiting star magnitude at a given exposure time
+# Limiting star magnitude
 maglim = 9.5
 
 # Query from GAIA lite

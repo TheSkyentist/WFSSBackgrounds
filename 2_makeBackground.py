@@ -6,15 +6,11 @@ import numpy as np
 from tqdm import tqdm
 from sep import Background
 from astropy.io import fits
-from jwst import datamodels
 from astropy.table import Table
 from multiprocessing import Pool
+from astropy.stats import sigma_clipped_stats
 from photutils.segmentation import detect_sources, detect_threshold
-from astropy.stats import gaussian_fwhm_to_sigma, sigma_clipped_stats
-from astropy.convolution import Tophat2DKernel, convolve, interpolate_replace_nans
-
-# JWST FWHMs
-filter_fwhm = dict(F090W=1.33,F115W=1.42,F140M=1.39,F150W=1.39,F158M=1.44,F200W=1.61,F277W=1.73,F356W=1.99,F380M=2.11,F430M=2.28,F444W=2.24,F480M=2.54)
+from astropy.convolution import Tophat2DKernel, interpolate_replace_nans
 
 # Define background function
 def extractBackground(filt):
@@ -39,16 +35,8 @@ def extractBackground(filt):
         # Rudimentary background subtraction
         bkg = Background(im,mask=mask).back()
 
-        # Get PSF kernel
-        # fwhm = filter_fwhm[filt]
-        # size = np.floor(fwhm)
-        # if (size % 2 == 0): size += 1.
-        # sigma = gaussian_fwhm_to_sigma*fwhm
-        # kernel = Gaussian2DKernel(sigma, x_size=size, y_size=size)
-
-        # Convolve and detect
+        # Detect
         thresh = detect_threshold(im-bkg,nsigma=1.0,background=bkg,error=err,mask=mask)
-        # imconv = convolve(im-bkg,kernel,normalize_kernel=True,preserve_nan=True)
         seg = detect_sources(im-bkg,thresh,npixels=3,connectivity=8)
 
         # Mask detected sources
@@ -58,38 +46,36 @@ def extractBackground(filt):
         # Find weighted mean of the image
         _,median,_ = sigma_clipped_stats(im,mask=mask)
 
-        # Keep track of medianed-out background
+        # Keep track of medianed-out background and mask
         bkgs[i] = im/median
         masks[i] = mask
-
-        # # Plot images
-        # from matplotlib import pyplot,colormaps as cm
-        # cmap = cm.get_cmap('gray')
-        # cmap.set_bad('red')
-        # ims = [im,bkg,nosource,nosource2]
-        # fig,ax = pyplot.subplots(1,len(ims),figsize=(5*len(ims),5))
-        # fig.subplots_adjust(wspace=0,hspace=0)
-        # for i,ax in zip(ims,ax):
-        #     ax.imshow(i,cmap=cmap,clim=np.nanpercentile(i,[1,99]))
-        #     ax.axis('off')
-        # fig.savefig('test.pdf')
-        # pyplot.close(fig)
 
     # Mask and median
     _,median,_ = sigma_clipped_stats(bkgs,mask=masks,axis=0)
     bkg = interpolate_replace_nans(median,kernel=Tophat2DKernel(radius=7))
 
-    # Save
+    # Create WFSS Background
     out = np.zeros(shape=(2048,2048),dtype=bkg.dtype)
-    out[4:-4,4:-4] = bkg
-    g,f = filt.lower().split('-')
-    fits.PrimaryHDU(out).writeto(f'wfssbackgrounds/nis-{f}-{g}_skyflat.fits',overwrite=True)
+    out[4:-4,4:-4] = bkg # Reference pixels to zero
 
-# Process
-pool = Pool(processes=8)
-pool.map_async(extractBackground,sorted(glob.glob('GR*')),chunksize=1)
-pool.close()
-pool.join()
+    # Set header information
+    g,f = filt.split('-')
+    hdu = fits.PrimaryHDU(out)
+    hdu.header = fits.getheader(f'{filt}/{filt}.fits')
+    hdu.header['PUPIL'] = f
+    hdu.header['FILTER'] = g
+
+    # Save to file
+    hdu.writeto(f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits',overwrite=True)
+
+# Main function
+if __name__ == '__main__':
+
+    # Multiprocess
+    pool = Pool(processes=12)
+    pool.map_async(extractBackground,sorted(glob.glob('GR*')),chunksize=1)
+    pool.close()
+    pool.join()
 
 
 
