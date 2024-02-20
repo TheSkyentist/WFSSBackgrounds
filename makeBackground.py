@@ -60,7 +60,7 @@ def extractBackground(filt):
         mask = np.logical_or(mask,seg.data>0)
         im[mask] = np.nan
 
-        # Find weighted mean of the image
+        # Find median
         _,median,_ = sigma_clipped_stats(im,mask=mask)
 
         # Keep track of medianed-out background and mask
