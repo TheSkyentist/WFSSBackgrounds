@@ -19,6 +19,9 @@ parser.add_argument('-d','--dontFlat',action="store_true",help="Don't flat-field
 args = parser.parse_args()
 dontFlat = args.dontFlat
 
+# Non reference pixels (in FULL mode)
+reg = (slice(4,-4),slice(4,-4))
+
 # Initialize Pipeline Step
 if not dontFlat:
     from jwst.flatfield import FlatFieldStep
@@ -39,13 +42,16 @@ def extractBackground(filt):
         # Open file and optionally flat-field
         if dontFlat:
             hdul = fits.open(o)
+            im = hdul['SCI'].data[reg].astype(np.float32)
+            err = hdul['ERR'].data[reg].astype(np.float32)
+            dq = hdul['DQ'].data[reg]
         else:
-            hdul = flat_field.process(o)
+            dm = flat_field.process(o)
+            im = dm.data[reg].astype(np.float32)
+            err = dm.err[reg].astype(np.float32)
+            dq = dm.dq[reg]
 
-        # Get data (extract non-reference pixels)
-        im = hdul['SCI'].data[4:-4,4:-4].astype(np.float32)
-        err = hdul['ERR'].data[4:-4,4:-4].astype(np.float32)
-        dq = hdul['DQ'].data[4:-4,4:-4]
+        # Mask data
         mask = dq > 0
         im[mask] = np.nan
 
@@ -73,7 +79,7 @@ def extractBackground(filt):
 
     # Create WFSS Background
     out = np.zeros(shape=(2048,2048),dtype=bkg.dtype)
-    out[4:-4,4:-4] = bkg # Reference pixels to zero
+    out[reg] = bkg # Reference pixels to zero
 
     # Set header information
     g,f = filt.split('-')
