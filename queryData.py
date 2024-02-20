@@ -64,7 +64,7 @@ for filt in sorted(np.unique(all_obs['filters'])):
     # Update date in header
     hdul = fits.open(filt+'/'+filt+'.fits',mode='update')
     time = datetime.now(timezone.utc).strftime('%Y-%M-%dT%H:%M:%S.%f')[:-3]
-    hdul[0].header['DATE'] = (time, 'Date of MAST query for this file (UTC)')
+    hdul[0].header['QDATE'] = (time, 'Date of MAST query for this file (UTC)')
     hdul.flush()
     hdul.close()
     
