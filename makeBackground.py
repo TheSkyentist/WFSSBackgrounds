@@ -2,6 +2,7 @@
 
 # Import packages
 import glob
+import argparse
 import numpy as np
 from tqdm import tqdm
 from sep import Background
@@ -12,11 +13,22 @@ from astropy.stats import sigma_clipped_stats
 from photutils.segmentation import detect_sources, detect_threshold
 from astropy.convolution import Tophat2DKernel, interpolate_replace_nans
 
+# Initialize parser
+parser = argparse.ArgumentParser()
+parser.add_argument('-d','--dontFlat',action="store_true",help="Don't flat-field the data")
+args = parser.parse_args()
+dontFlat = args.dontFlat
+
+# Initialize Pipeline Step
+if not dontFlat:
+    from jwst.flatfield import FlatFieldStep
+    flat_field = FlatFieldStep()
+
 # Define background function
 def extractBackground(filt):
 
     # Get products
-    out = [f"{filt}/{f.replace('rate','out')}" for f in Table.read(f'{filt}/{filt}.fits')['productFilename'].tolist()]
+    out = [f"{filt}/{f}" for f in Table.read(f'{filt}/{filt}.fits')['productFilename'].tolist()]
     out = [o for o in out if fits.getval(o,'SUBARRAY','PRIMARY') == 'FULL']
 
     # Make arrays
@@ -24,8 +36,13 @@ def extractBackground(filt):
     masks = np.zeros(shape=(len(out),2040,2040),dtype=bool)
     for i,o in tqdm(enumerate(out),total=len(out)):
 
+        # Open file and optionally flat-field
+        if dontFlat:
+            hdul = fits.open(o)
+        else:
+            hdul = flat_field.process(o)
+
         # Get data (extract non-reference pixels)
-        hdul = fits.open(o)
         im = hdul['SCI'].data[4:-4,4:-4].astype(np.float32)
         err = hdul['ERR'].data[4:-4,4:-4].astype(np.float32)
         dq = hdul['DQ'].data[4:-4,4:-4]
@@ -64,6 +81,10 @@ def extractBackground(filt):
     hdu.header = fits.getheader(f'{filt}/{filt}.fits')
     hdu.header['PUPIL'] = f
     hdu.header['FILTER'] = g
+
+    # Record if we have flat-fielded
+    if not dontFlat:
+        hdu.header['FIXFLAT'] = True
 
     # Save to file
     hdu.writeto(f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits',overwrite=True)
