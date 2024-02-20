@@ -12,6 +12,7 @@ To use these scripts to create your own WFSS backgrounds, first make sure you ha
 First run the ```queryData.py``` script in order to download all of the public WFSS NIRISS RATE files. This script will exclude all products which have a 9.5mag or brighter star nearby. This downloading and cross-matching can take a while. The product lists will be saved in the created directories as well, along with a time-stamp of when the files were created. 
 
 Then run the ```makeBackgrounds.py``` script to make all of the backgrounds from the downloaded files. The backgrounds are created by doing the following:
+
 0. Flat-fielding the input data. This is done as these backgrounds are created with the purpose of being used with [grizli](https://github.com/gbrammer/grizli/) (hence the file-naming convention). Grizli expects flat-fielded WFSS Backgrounds, so by flat-fielding the inputs, we produce a flat-fielded background. Pass the "--dontFlat" command-line option to skip this. 
 1. Measure a rudimentary background with sep. 
 2. Perform source detection on the rudimentary sep-background-subtracted image. 
