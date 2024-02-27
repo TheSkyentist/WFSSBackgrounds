@@ -10,6 +10,7 @@ from astropy.io import fits
 from astropy.table import Table
 from multiprocessing import Pool
 from astropy.stats import sigma_clipped_stats
+from skimage.restoration import denoise_tv_chambolle
 from photutils.segmentation import detect_sources, detect_threshold
 from astropy.convolution import Tophat2DKernel, interpolate_replace_nans
 
@@ -20,7 +21,10 @@ args = parser.parse_args()
 dontFlat = args.dontFlat
 
 # Non reference pixels (in FULL mode)
-reg = (slice(4,-4),slice(4,-4))
+nonref = (slice(4,-4),slice(4,-4))
+
+# Median measurement region
+medreg = (slice(128,-128),slice(128,-128))
 
 # Initialize Pipeline Step
 if not dontFlat:
@@ -42,14 +46,14 @@ def extractBackground(filt):
         # Open file and optionally flat-field
         if dontFlat:
             hdul = fits.open(o)
-            im = hdul['SCI'].data[reg].astype(np.float32)
-            err = hdul['ERR'].data[reg].astype(np.float32)
-            dq = hdul['DQ'].data[reg]
+            im = hdul['SCI'].data[nonref].astype(np.float32)
+            err = hdul['ERR'].data[nonref].astype(np.float32)
+            dq = hdul['DQ'].data[nonref]
         else:
             dm = flat_field.process(o)
-            im = dm.data[reg].astype(np.float32)
-            err = dm.err[reg].astype(np.float32)
-            dq = dm.dq[reg]
+            im = dm.data[nonref].astype(np.float32)
+            err = dm.err[nonref].astype(np.float32)
+            dq = dm.dq[nonref]
 
         # Mask data
         mask = dq > 0
@@ -66,20 +70,23 @@ def extractBackground(filt):
         mask = np.logical_or(mask,seg.data>0)
         im[mask] = np.nan
 
-        # Find median
-        _,median,_ = sigma_clipped_stats(im,mask=mask)
+        # Find median to normalize
+        _,norm,_ = sigma_clipped_stats(im[medreg],sigma=1,mask=mask[medreg])
 
         # Keep track of medianed-out background and mask
-        bkgs[i] = im/median
+        bkgs[i] = im/norm
         masks[i] = mask
 
     # Mask and median
-    _,median,_ = sigma_clipped_stats(bkgs,mask=masks,axis=0)
+    _,median,_ = sigma_clipped_stats(bkgs,mask=masks,sigma_lower=1,sigma_upper=3,axis=0)
     bkg = interpolate_replace_nans(median,kernel=Tophat2DKernel(radius=7))
 
+    # Denoise
+    den = denoise_tv_chambolle(bkg)
+
     # Create WFSS Background
-    out = np.zeros(shape=(2048,2048),dtype=bkg.dtype)
-    out[reg] = bkg # Reference pixels to zero
+    out = np.zeros(shape=(2048,2048),dtype=den.dtype)
+    out[nonref] = den # Reference pixels to zero
 
     # Set header information
     g,f = filt.split('-')
