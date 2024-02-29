@@ -8,4 +8,4 @@ dependencies:
 - photutils
 - pip:
   - git+https://github.com/astropy/astroquery.git # For flat downloads
-  - jwst # Only required for flat-fielding
+  - jwst

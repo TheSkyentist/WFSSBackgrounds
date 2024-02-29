@@ -9,11 +9,12 @@ from sep import Background
 from astropy.io import fits
 from astropy.table import Table
 from multiprocessing import Pool
+from jwst.flatfield import FlatFieldStep
 from astropy.stats import sigma_clipped_stats
 from skimage.restoration import denoise_tv_chambolle
 from photutils.segmentation import detect_sources, detect_threshold
 from astropy.convolution import Tophat2DKernel, interpolate_replace_nans
-
+    
 # Initialize parser
 parser = argparse.ArgumentParser()
 parser.add_argument('-d','--dontFlat',action="store_true",help="Don't flat-field the data")
@@ -27,9 +28,7 @@ nonref = (slice(4,-4),slice(4,-4))
 medreg = (slice(128,-128),slice(128,-128))
 
 # Initialize Pipeline Step
-if not dontFlat:
-    from jwst.flatfield import FlatFieldStep
-    flat_field = FlatFieldStep()
+flat_field = FlatFieldStep()
 
 # Define background function
 def extractBackground(filt):
@@ -63,7 +62,7 @@ def extractBackground(filt):
         bkg = Background(im,mask=mask).back()
 
         # Detect
-        thresh = detect_threshold(im-bkg,nsigma=1.0,background=bkg,error=err,mask=mask)
+        thresh = detect_threshold(im-bkg,nsigma=1,background=bkg,error=err,mask=mask)
         seg = detect_sources(im-bkg,thresh,npixels=3,connectivity=8)
 
         # Mask detected sources
@@ -81,26 +80,27 @@ def extractBackground(filt):
     _,median,_ = sigma_clipped_stats(bkgs,mask=masks,sigma_lower=1,sigma_upper=3,axis=0)
     bkg = interpolate_replace_nans(median,kernel=Tophat2DKernel(radius=7))
 
-    # Denoise
-    den = denoise_tv_chambolle(bkg)
+    # Denoise (only if we flat-fielded)
+    if not dontFlat:
+        den = denoise_tv_chambolle(bkg)
 
     # Create WFSS Background
     out = np.zeros(shape=(2048,2048),dtype=den.dtype)
     out[nonref] = den # Reference pixels to zero
 
-    # Set header information
-    g,f = filt.split('-')
-    hdu = fits.PrimaryHDU(out)
-    hdu.header = fits.getheader(f'{filt}/{filt}.fits')
-    hdu.header['PUPIL'] = f
-    hdu.header['FILTER'] = g
+    # Open CRDS WFSS background file
+    hdul = fits.open(FlatFieldStep().get_reference_file(o, 'wfssbkg'))
+    
+    # Update data
+    hdul[1].data = out
+    hdul[0].header['QDATE'] = fits.getval(f'{filt}/{filt}.fits','QDATE','PRIMARY')
 
     # Record if we have flat-fielded
-    if not dontFlat:
-        hdu.header['FIXFLAT'] = True
+    if not dontFlat: hdul[0].header['FIXFLAT'] = True
 
     # Save to file
-    hdu.writeto(f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits',overwrite=True)
+    g,f = filt.split('-')
+    hdul.writeto(f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits',overwrite=True)
 
 # Main function
 if __name__ == '__main__':
@@ -110,6 +110,3 @@ if __name__ == '__main__':
     pool.map_async(extractBackground,sorted(glob.glob('GR*')),chunksize=1)
     pool.close()
     pool.join()
-
-
-
