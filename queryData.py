@@ -25,8 +25,11 @@ maglim = 9.5
 # Query from GAIA lite
 Gaia.MAIN_GAIA_TABLE = "gaiadr3.gaia_source_lite"
 
+# Filters we care about
+filts = ['GR150C;F115W','GR150C;F150W','GR150C;F200W','GR150R;F115W','GR150R;F150W','GR150R;F200W']
+
 # Iterate over filters and grisms
-for filt in sorted(np.unique(all_obs['filters'])):
+for filt in filts:
 
     print(filt)
 
