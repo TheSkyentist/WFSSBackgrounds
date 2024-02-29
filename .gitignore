@@ -5,5 +5,8 @@ wfssbackgrounds/
 # Exclude comparison script
 compare*
 
+# Exclude application script
+applyBackgrounds*
+
 # Exclude macOS .DS_Store files
 .DS_Store
