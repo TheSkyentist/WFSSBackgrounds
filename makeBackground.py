@@ -21,6 +21,9 @@ parser.add_argument('-d','--dontFlat',action="store_true",help="Don't flat-field
 args = parser.parse_args()
 dontFlat = args.dontFlat
 
+# Grism filters
+filts = ['GR150C-F115W','GR150C-F150W','GR150C-F200W','GR150R-F115W','GR150R-F150W','GR150R-F200W']
+
 # Non reference pixels (in FULL mode)
 nonref = (slice(4,-4),slice(4,-4))
 
@@ -42,17 +45,11 @@ def extractBackground(filt):
     masks = np.zeros(shape=(len(out),2040,2040),dtype=bool)
     for i,o in tqdm(enumerate(out),total=len(out)):
 
-        # Open file and optionally flat-field
-        if dontFlat:
-            hdul = fits.open(o)
+        # Open file  flat-field
+        with fits.open(o) as hdul:
             im = hdul['SCI'].data[nonref].astype(np.float32)
             err = hdul['ERR'].data[nonref].astype(np.float32)
             dq = hdul['DQ'].data[nonref]
-        else:
-            dm = flat_field.process(o)
-            im = dm.data[nonref].astype(np.float32)
-            err = dm.err[nonref].astype(np.float32)
-            dq = dm.dq[nonref]
 
         # Mask data
         mask = dq > 0
@@ -81,15 +78,19 @@ def extractBackground(filt):
     bkg = interpolate_replace_nans(median,kernel=Tophat2DKernel(radius=7))
 
     # Denoise (only if we flat-fielded)
-    if not dontFlat:
-        den = denoise_tv_chambolle(bkg)
+    den = denoise_tv_chambolle(bkg)
 
     # Create WFSS Background
     out = np.zeros(shape=(2048,2048),dtype=den.dtype)
     out[nonref] = den # Reference pixels to zero
 
+    # If don't flat, undo Flat-Field
+    if dontFlat:
+        flat_file = flat_field.get_reference_file(o,'flat')
+        out *= fits.getdata(flat_file)
+
     # Open CRDS WFSS background file
-    hdul = fits.open(FlatFieldStep().get_reference_file(o, 'wfssbkg'))
+    hdul = fits.open(flat_field.get_reference_file(o, 'wfssbkg'))
     
     # Update data
     hdul[1].data = out
@@ -106,7 +107,7 @@ def extractBackground(filt):
 if __name__ == '__main__':
 
     # Multiprocess
-    pool = Pool(processes=12)
-    pool.map_async(extractBackground,sorted(glob.glob('GR*')),chunksize=1)
+    pool = Pool(processes=len(filts))
+    pool.map_async(extractBackground,filts,chunksize=1)
     pool.close()
     pool.join()
