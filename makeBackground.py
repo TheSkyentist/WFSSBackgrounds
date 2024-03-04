@@ -14,7 +14,7 @@ from astropy.stats import sigma_clipped_stats
 from skimage.restoration import denoise_tv_chambolle
 from photutils.segmentation import detect_sources, detect_threshold
 from astropy.convolution import Tophat2DKernel, interpolate_replace_nans
-    
+
 # Initialize parser
 parser = argparse.ArgumentParser()
 parser.add_argument('-d','--dontFlat',action="store_true",help="Don't flat-field the data")
