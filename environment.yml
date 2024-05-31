@@ -2,10 +2,11 @@ name: wfssback
 channels:
   - conda-forge
 dependencies:
-- python==3.11.* # Required by JWST pipeline
+- python==3.12.* # Required by JWST pipeline
 - sep
 - astropy
 - photutils
+- scikit-image
 - pip:
-  - git+https://github.com/astropy/astroquery.git # For flat downloads
-  - jwst
+  - maskfill
+  - git+https://github.com/spacetelescope/jwst.git
