@@ -4,76 +4,101 @@
 import os
 import json
 import numpy as np
-from tqdm import tqdm
+from tqdm import tqdm,trange
+from itertools import product
+from multiprocessing import Pool
 from datetime import datetime, timezone
 
 # Astropy packages
 import astropy.units as u
 from astropy.io import fits
-from astroquery.gaia import Gaia
 from astropy.table import vstack
+from astroquery.gaia import Gaia
 from astroquery.mast import Observations
 from astropy.coordinates import SkyCoord
 
-# Query all data
-all_obs = Observations.query_criteria(instrument_name="NIRISS/WFSS",obs_collection="JWST",dataRights="PUBLIC",intentType='science')
-all_obs = all_obs[np.unique(all_obs['obs_id'],return_index=True)[1]]
-
-# Limiting star magnitude
-maglim = 9.5
-
 # Query from GAIA lite
-Gaia.MAIN_GAIA_TABLE = "gaiadr3.gaia_source_lite"
+def gquery(c,maglim=9.5,radius=1/30):
+    
+    return Gaia.launch_job(
+        f'''
+            SELECT TOP 1 g.phot_g_mean_mag
+            FROM gaiadr3.gaia_source_lite as g
+            WHERE 
+                CONTAINS(
+                    POINT('ICRS',g.ra,g.dec),
+                    CIRCLE('ICRS',{c.ra.deg},{c.dec.deg},{radius})
+                ) = 1
+                AND (g.phot_g_mean_mag < {maglim})
+        ''').get_results()
 
-# Filters we care about
-filts = ['GR150C;F115W','GR150C;F150W','GR150C;F200W','GR150R;F115W','GR150R;F150W','GR150R;F200W']
+if __name__ == '__main__':
 
-# Iterate over filters and grisms
-for filt in filts:
+    # Query all data
+    all_obs = Observations.query_criteria(
+        instrument_name="NIRISS/WFSS",
+        obs_collection="JWST",
+        dataRights="PUBLIC",
+        intentType='science'
+    )
+    all_obs = all_obs[np.unique(all_obs['obs_id'],return_index=True)[1]]
 
-    print(filt)
+    # Restrict to unique RA and dec
+    coords,inverse = np.unique(all_obs['s_ra','s_dec'],return_inverse=True)
 
     # Restrict to filter
-    obs = all_obs[all_obs['filters'] == filt]
-    coords = SkyCoord(ra=obs['s_ra'], dec=obs['s_dec'], unit=u.degree, frame='icrs')
+    coords = SkyCoord(ra=coords['s_ra'], dec=coords['s_dec'], unit=u.degree, frame='icrs')
 
     # Query GAIA
-    gaia = [Gaia.cone_search(c, radius=2*u.arcmin).get_results() for c in tqdm(coords)]
+    print('Querying GAIA, removing contaminated obervations')
+    with Pool(10) as pool: gaia = list(tqdm(pool.imap(gquery, coords), total=len(coords)))
 
-    # Find bright stars
-    good = np.array([g['phot_g_mean_mag'].min() > maglim for g in gaia])
-    obs = obs[good]
+    # Check if a bright star is nearby
+    good = np.array([len(g) == 0 for g in gaia])
+    all_obs = all_obs[good[inverse]]
 
-    # Get products
-    tables = [Observations.get_product_list(o) for o in tqdm(obs)]
-    allprods = []
-    for t in tables:
-        good = np.logical_and(
-            t['productType']=='SCIENCE',
-            t['productSubGroupDescription']=='RATE'
-            )
-        t = t[good]
-        t['prvversion'] = t['prvversion'].astype(str)
-        allprods.append(t)
-    allprods = vstack(allprods)
-    prods = allprods[np.unique(allprods['dataURI'],return_index=True)[1]]
+    # Create product filter grism combos
+    filts = [';'.join(p) for p in product(['GR150C','GR150R'],['F115W','F150W','F200W'])]
 
-    # Replace filter name
-    filt = filt.replace(';','-')
+    # Iterate over filters and grisms
+    for filt in filts:
 
-    # Save product list
-    prods.write(filt+'/'+filt+'.fits',overwrite=True)
+        # Restrict to filter
+        obs = all_obs[all_obs['filters'] == filt]
 
-    # Update date in header
-    hdul = fits.open(filt+'/'+filt+'.fits',mode='update')
-    time = datetime.now(timezone.utc).strftime('%Y-%M-%dT%H:%M:%S.%f')[:-3]
-    hdul[0].header['QDATE'] = (time, 'Date of MAST query for this file (UTC)')
-    hdul.flush()
-    hdul.close()
-    
-    # Download products
-    if not os.path.isdir(filt):
-        os.mkdir(filt)
-    Observations.download_products(prods,download_dir=filt,flat=True)
+        # Get products
+        N = len(obs) // 256
+        tables = [Observations.get_product_list(obs[i::N]) for i in trange(N)]
+        # responses = [Observations.get_product_list(obs[i::N]) for i in trange(N)]
+        # tables = [Table(json.loads(r.content)['data']) for r in responses]
+        for i,t in enumerate(tables):
+            good = np.logical_and(
+                t['productType']=='SCIENCE',
+                t['productSubGroupDescription']=='RATE'
+                )
+            t = t[good]
+            t['prvversion'] = t['prvversion'].astype(str)
+            tables[i] = t
+        allprods = vstack(tables)
+        prods = allprods[np.unique(allprods['dataURI'],return_index=True)[1]]
+
+        # Replace filter name
+        filt = filt.replace(';','-')
+
+        # Save product list
+        if not os.path.isdir(filt):
+            os.mkdir(filt)
+        prods.write(filt+'/'+filt+'.fits',overwrite=True)
+
+        # Update date in header
+        hdul = fits.open(filt+'/'+filt+'.fits',mode='update')
+        time = datetime.now(timezone.utc).strftime('%Y-%M-%dT%H:%M:%S.%f')[:-3]
+        hdul[0].header['QDATE'] = (time, 'Date of MAST query for this file (UTC)')
+        hdul.flush()
+        hdul.close()
+        
+        # Download products
+
+        Observations.download_products(prods,download_dir=filt,flat=True)
 
 
