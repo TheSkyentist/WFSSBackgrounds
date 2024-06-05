@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
 # Python Packages
-import warnings
 import argparse
 import numpy as np
 from tqdm import tqdm
@@ -21,6 +20,7 @@ from jwst.flatfield import FlatFieldStep
 flat_field = FlatFieldStep()
 
 # Ignore RuntimeWarnings
+# import warnings
 # warnings.simplefilter("ignore", category=RuntimeWarning)
 
 # Grism filters
@@ -32,10 +32,10 @@ nonref = (slice(4,-4),slice(4,-4))
 # Define background function
 def denoiseNsmooth(filt):
 
+    print(f'Denoising and smoothing {filt}')
+
     # Get a valid product
-    for p in Table.read(f'{filt}/{filt}.fits')['productFilename']:
-        h = fits.getheader(f'{filt}/{p}')
-        if np.logical_and(h['READPATT']=='NIS',h['SUBARRAY']=='FULL'): break
+    p = Table.read(f'{filt}/{filt}.fits')['productFilename'][0]
 
     # Find CRDS WFSS background
     wfssbkg = fits.open(flat_field.get_reference_file(f'{filt}/{p}','wfssbkg'))
@@ -80,8 +80,7 @@ def denoiseNsmooth(filt):
 
     # Save to file
     wfssbkg.writeto(f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits',overwrite=True)
-
-# denoiseNsmooth(filts[-1])
+    print(f'Denoised and smoothed {filt}')
 
 # Main function
 if __name__ == '__main__':

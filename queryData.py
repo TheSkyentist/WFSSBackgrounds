@@ -12,10 +12,10 @@ from datetime import datetime, timezone
 # Astropy packages
 import astropy.units as u
 from astropy.io import fits
-from astropy.table import vstack
 from astroquery.gaia import Gaia
 from astroquery.mast import Observations
 from astropy.coordinates import SkyCoord
+from astropy.table import Table,vstack,hstack
 
 # Query from GAIA lite
 def gquery(c,maglim=9.5,radius=1/30):
@@ -34,12 +34,16 @@ def gquery(c,maglim=9.5,radius=1/30):
 
 if __name__ == '__main__':
 
+    # Record time of query
+    time = datetime.now(timezone.utc).strftime('%Y-%M-%dT%H:%M:%S.%f')[:-3]
+
     # Query all data
     all_obs = Observations.query_criteria(
-        instrument_name="NIRISS/WFSS",
-        obs_collection="JWST",
-        dataRights="PUBLIC",
-        intentType='science'
+        instrument_name='NIRISS/WFSS',
+        obs_collection='JWST',
+        dataRights='PUBLIC',
+        intentType='science',
+        calib_level=2
     )
     all_obs = all_obs[np.unique(all_obs['obs_id'],return_index=True)[1]]
 
@@ -67,19 +71,13 @@ if __name__ == '__main__':
         obs = all_obs[all_obs['filters'] == filt]
 
         # Get products
-        N = len(obs) // 256
-        tables = [Observations.get_product_list(obs[i::N]) for i in trange(N)]
-        # responses = [Observations.get_product_list(obs[i::N]) for i in trange(N)]
-        # tables = [Table(json.loads(r.content)['data']) for r in responses]
-        for i,t in enumerate(tables):
-            good = np.logical_and(
-                t['productType']=='SCIENCE',
-                t['productSubGroupDescription']=='RATE'
-                )
-            t = t[good]
-            t['prvversion'] = t['prvversion'].astype(str)
-            tables[i] = t
-        allprods = vstack(tables)
+        allprods = Observations.get_product_list(obs)
+        good = np.logical_and.reduce([
+            allprods['filters']==filt,
+            allprods['productType']=='SCIENCE',
+            allprods['productSubGroupDescription']=='RATE'
+            ])
+        allprods = allprods[good]
         prods = allprods[np.unique(allprods['dataURI'],return_index=True)[1]]
 
         # Replace filter name
@@ -88,17 +86,22 @@ if __name__ == '__main__':
         # Save product list
         if not os.path.isdir(filt):
             os.mkdir(filt)
-        prods.write(filt+'/'+filt+'.fits',overwrite=True)
+        
+        # Download products
+        Observations.download_products(prods,download_dir=filt,flat=True)
+
+        # Limit list to NIS and FULL
+        pfiles = [f"{filt}/{f}" for f in prods['productFilename']]
+
+        # Get header information
+        keys = ['READPATT','SUBARRAY','EFFINTTM']
+        htable = Table([[fits.getval(p,k,'PRIMARY') for p in pfiles] for k in keys],names=keys)
+
+        # Restrict to NIS and FULL
+        hstack([prods,htable])[np.logical_and(htable['READPATT']=='NIS',htable['SUBARRAY']=='FULL')].write(f'{filt}/{filt}.fits',overwrite=True)
 
         # Update date in header
         hdul = fits.open(filt+'/'+filt+'.fits',mode='update')
-        time = datetime.now(timezone.utc).strftime('%Y-%M-%dT%H:%M:%S.%f')[:-3]
         hdul[0].header['QDATE'] = (time, 'Date of MAST query for this file (UTC)')
         hdul.flush()
         hdul.close()
-        
-        # Download products
-
-        Observations.download_products(prods,download_dir=filt,flat=True)
-
-

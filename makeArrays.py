@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 # Python Packages
+import shutil
 import numpy as np
 from tqdm import tqdm
 from itertools import product
@@ -24,20 +25,18 @@ filts = ['-'.join(p) for p in product(['GR150C','GR150R'],['F115W','F150W','F200
 # Non reference pixels (in FULL mode)
 nonref = (slice(4,-4),slice(4,-4))
 
+# Delete Applied Files
+for filt in filts:
+    for ext in ['_custom','_crds']:
+        shutil.rmtree(f'{filt}{ext}',ignore_errors=True)
+
 # Define background function
 def makeSourceMask(filt):
 
     # Get products
     prods = Table.read(f'{filt}/{filt}.fits')
-    pfiles = [f"{filt}/{f}" for f in prods['productFilename']]
-
-    # Get header information
-    keys = ['READPATT','SUBARRAY']
-    htable = Table([[fits.getval(p,k,'PRIMARY') for p in pfiles] for k in keys],names=keys)
-
-    # Restrict to NIS and FULL
-    rate = np.array(pfiles)[np.logical_and(htable['READPATT']=='NIS',htable['SUBARRAY']=='FULL')]
-
+    rate = [f"{filt}/{f}" for f in prods['productFilename']]
+    
     # Make arrays
     masks = np.zeros(shape=(len(rate),2040,2040),dtype=bool)
     flatted = np.zeros(shape=(len(rate),2040,2040),dtype=float)

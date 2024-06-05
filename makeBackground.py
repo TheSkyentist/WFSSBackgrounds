@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 # Python Packages
+import os
 import warnings
 import argparse
 import numpy as np
@@ -24,8 +25,14 @@ medreg = (slice(128,-128),slice(128,-128))
 # Define background function
 def makeAvgBackground(filt):
 
+    print(f'Creating background for {filt}')
+
     # Load Arrays
-    masks = np.load(f'{filt}/masks.npy')
+    if os.path.exists(f'{filt}_custom/masks.npy'):
+        print('Using custom masks')
+        masks = np.load(f'{filt}_custom/masks.npy')
+    else:
+        masks = np.load(f'{filt}/masks.npy')
     flatted = np.load(f'{filt}/flatted.npy')
 
     # Normalize
