@@ -33,9 +33,7 @@ def createAppliedMask(filt):
 
     # Get products
     prods = Table.read(f"{filt.split('_')[0]}/{filt.split('_')[0]}.fits")
-    print(prods)
     files = [f"{filt}/{f.replace('.fits','_flatfield.fits')}" for f in prods['productFilename']]
-    print(files)
 
     # Make arrays
     masks = np.zeros(shape=(len(files),2040,2040),dtype=bool)

@@ -25,13 +25,11 @@ filts = ['-'.join(p) for p in product(['GR150C','GR150R'],['F115W','F150W','F200
 # Non reference pixels (in FULL mode)
 nonref = (slice(4,-4),slice(4,-4))
 
-# Delete Applied Files
-for filt in filts:
-    for ext in ['_custom','_crds']:
-        shutil.rmtree(f'{filt}{ext}',ignore_errors=True)
-
 # Define background function
 def makeSourceMask(filt):
+
+    for ext in ['_custom','_crds']:
+        shutil.rmtree(f'{filt}{ext}',ignore_errors=True)
 
     # Get products
     prods = Table.read(f'{filt}/{filt}.fits')
