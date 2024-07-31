@@ -3,7 +3,6 @@
 # Python Packages
 import os
 import warnings
-import argparse
 import numpy as np
 from maskfill import maskfill
 from itertools import product
@@ -17,7 +16,7 @@ from astropy.stats import sigma_clipped_stats
 warnings.simplefilter("ignore", category=RuntimeWarning)
 
 # Grism filters
-filts = ['-'.join(p) for p in product(['GR150C','GR150R'],['F115W','F150W','F200W'])]
+filts = ['-'.join(p) for p in product(['CLEAR','GR150C','GR150R'],['F115W','F150W','F200W'])]
 
 # Median measurement region
 medreg = (slice(128,-128),slice(128,-128))

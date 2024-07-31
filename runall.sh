@@ -3,7 +3,7 @@
 echo "Running all scripts"
 
 # First Run
-./queryData.py # Download Data
+# ./queryData.py # Download Data
 ./makeArrays.py # This deletes the old applied directories and creates new source Masks
 ./makeBackground.py # Creates median background using naive masks
 ./denoiseNsmooth.py # Smooths the background
@@ -19,3 +19,5 @@ echo "Running all scripts"
 ./compareSub.py # Compares average subtraced profiles
 
 # Otherplots
+./zodi.py # Plot the average background as a function of ecliptic latitude
+./compareMask.py # Compare the masks on one image

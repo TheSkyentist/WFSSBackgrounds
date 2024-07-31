@@ -1,9 +1,11 @@
 # Exclud downloaded directories and files
 GR*/
+CL*/
 wfssbackgrounds/
 
-# Exclude PDFs
+# Exclude Plots
 *pdf
+*png
 
 # Exclude macOS .DS_Store files
 .DS_Store

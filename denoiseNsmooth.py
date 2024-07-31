@@ -1,15 +1,13 @@
 #! /usr/bin/env python
 
 # Python Packages
-import argparse
 import numpy as np
-from tqdm import tqdm
 from itertools import product
 from multiprocessing import Pool
 
 # Image Processing Packages
 from maskfill import maskfill
-from skimage.restoration import estimate_sigma,denoise_nl_means
+from skimage.restoration import estimate_sigma, denoise_nl_means
 
 # Astropy Packages
 from astropy.io import fits
@@ -17,6 +15,7 @@ from astropy.table import Table
 
 # JWST Pipeline Packages
 from jwst.flatfield import FlatFieldStep
+
 flat_field = FlatFieldStep()
 
 # Ignore RuntimeWarnings
@@ -24,21 +23,24 @@ flat_field = FlatFieldStep()
 # warnings.simplefilter("ignore", category=RuntimeWarning)
 
 # Grism filters
-filts = ['-'.join(p) for p in product(['GR150C','GR150R'],['F115W','F150W','F200W'])]
+filts = [
+    '-'.join(p) for p in product(['CLEAR','GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
+]
 
 # Outside reference regions
-nonref = (slice(4,-4),slice(4,-4))
+nonref = (slice(4, -4), slice(4, -4))
+
 
 # Define background function
 def denoiseNsmooth(filt):
-
     print(f'Denoising and smoothing {filt}')
 
     # Get a valid product
     p = Table.read(f'{filt}/{filt}.fits')['productFilename'][0]
 
     # Find CRDS WFSS background
-    wfssbkg = fits.open(flat_field.get_reference_file(f'{filt}/{p}','wfssbkg'))
+    ref = 'flat' if 'CLEAR' in filt else 'wfssbkg'
+    wfssbkg = fits.open(flat_field.get_reference_file(f'{filt}/{p}', ref))
     dq = wfssbkg['DQ'].data[nonref]
 
     # Load arrays
@@ -51,42 +53,49 @@ def denoiseNsmooth(filt):
         patch_size=5,
         patch_distance=6,
         fast_mode=True,
-        h=0.8*sigma_est,
+        h=0.8 * sigma_est,
         sigma=sigma_est,
-        preserve_range=True
+        preserve_range=True,
     )
-    den,_ = maskfill(den,dq>0,smooth=False)
+    den, _ = maskfill(den, dq > 0, smooth=False)
 
     # Create WFSS Background
-    out = np.zeros(shape=(2048,2048),dtype=den.dtype)
-    out[nonref] = den # Reference pixels to zero
-    
+    out = np.zeros(shape=(2048, 2048), dtype=den.dtype)
+    out[nonref] = den  # Reference pixels to zero
+
     # Reverse the flat-field
     ratehdul = fits.open(f'{filt}/{p}')
     ratehdul['SCI'].data = out
-    unflat = flat_field.call(ratehdul,inverse=True).data
+    unflat = flat_field.call(ratehdul, inverse=True).data
 
     # Place the unflat fielded background into HDUL
-    wfssbkg['SCI'].header['QDATE'] = fits.getval(f'{filt}/{filt}.fits','QDATE','PRIMARY')
+    wfssbkg['SCI'].header['QDATE'] = fits.getval(
+        f'{filt}/{filt}.fits', 'QDATE', 'PRIMARY'
+    )
     wfssbkg['PRIMARY'].data = unflat
 
     # Save to file
-    g,f = filt.split('-')
-    wfssbkg.writeto(f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat_unflat.fits',overwrite=True)
+    g, f = filt.split('-')
+    wfssbkg.writeto(
+        f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat_unflat.fits',
+        overwrite=True,
+    )
 
     # Save the flat-fielded background
     wfssbkg['SCI'].data = out
     wfssbkg['PRIMARY'].header['FIXFLAT'] = True
 
     # Save to file
-    wfssbkg.writeto(f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits',overwrite=True)
+    wfssbkg.writeto(
+        f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits', overwrite=True
+    )
     print(f'Denoised and smoothed {filt}')
+
 
 # Main function
 if __name__ == '__main__':
-
     # Multiprocess
     pool = Pool(processes=len(filts))
-    pool.map_async(denoiseNsmooth,filts,chunksize=1)
+    pool.map_async(denoiseNsmooth, filts, chunksize=1)
     pool.close()
     pool.join()
