@@ -9,4 +9,4 @@ dependencies:
 - ipython
 - pip:
   - git+https://github.com/spacetelescope/jwst.git
-  - grizli[jwst] @ git+https://github.com/TheSkyentist/grizli.git@dev
+  - grizli[jwst] @ git+https://github.com/TheSkyentist/grizli.git@img-backsub
