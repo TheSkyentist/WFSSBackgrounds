@@ -14,21 +14,15 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-# Median Region
-medreg = (slice(128, -128), slice(128, -128))
-
-# Outside reference regions
-nonref = (slice(4, -4), slice(4, -4))
 
 def makeFig(grism):
-
     # Create figure
     size = 4
     fig = pyplot.figure(figsize=(0.95 * size * 3, 2 * size))
     gs = fig.add_gridspec(2, 3, hspace=0.1, wspace=0)
 
     # Iterate over filts
-    for i,filt in enumerate(['F115W', 'F150W', 'F200W']):
+    for i, filt in enumerate(['F115W', 'F150W', 'F200W']):
         # Get grism and filter
         gf = f'{grism}-{filt}'
 
@@ -43,13 +37,19 @@ def makeFig(grism):
             # Get background strenghts
             if (ext == '_crds') and (grism == 'CLEAR'):
                 heights = np.reshape(
-                    [np.genfromtxt(f)[1] for f in sorted(glob.glob(f'{gf}_custom/*.info'))],
+                    [
+                        np.genfromtxt(f)[1]
+                        for f in sorted(glob.glob(f'{gf}_custom/*.info'))
+                    ],
                     (len(masks), 1, 1),
                 )
                 subbed -= heights
             else:
                 heights = np.reshape(
-                    [np.genfromtxt(f)[1] for f in sorted(glob.glob(f'{gf}{ext}/*.info'))],
+                    [
+                        np.genfromtxt(f)[1]
+                        for f in sorted(glob.glob(f'{gf}{ext}/*.info'))
+                    ],
                     (len(masks), 1, 1),
                 )
 
@@ -61,13 +61,14 @@ def makeFig(grism):
             # Iterate over dispersion direction
             for k in range(2):
                 # Get axis
-                axis = k + 1 #(i + k) % 2 + 1
+                axis = k + 1  # (i + k) % 2 + 1
 
                 # Get summary statistics
-                # medians = np.nanmedian((subbed/heights),axis=axis)
+                # medians = np.nanmedian((subbed / heights), axis=axis)
                 _, medians, _ = sigma_clipped_stats(
                     (subbed / heights), sigma=1, mask=masks, axis=axis
                 )
+                medians *= 100  # Convert to percent
 
                 # Get summary of summary statistics
                 # median = np.nanmedian(medians,axis=0)
@@ -87,23 +88,29 @@ def makeFig(grism):
                 )
                 ax.set(
                     xlim=(0, 2048),
-                    ylim=(-0.05, 0.05),
+                    ylim=(-5, 5),
                     xticks=[0, 500, 1000, 1500, 2000],
                     xticklabels=[0, 500, 1000, 1500, ''],
                 )
 
                 # Get median and rms (rounded strings)
-                med = np.nanmedian(median) * 100
-                rms = np.nanstd(median) * 100
-                ax.text(
-                    0.035,
-                    0.25,
-                    f'{r'$\sigma$'}: {med:.3f}{r'\%'}\n{r'$\mu$'}: {rms:.3f}{r'\%'}',
-                    transform=ax.transAxes,
-                    fontsize=15,
-                    ha='left',
-                    va='center',
-                )
+                labels = [
+                    r'$-2\sigma$',
+                    r'$-1\sigma$',
+                    r'$\mu$',
+                    r'$+1\sigma$',
+                    r'$+2\sigma$',
+                ]
+                percentiles = [
+                    fr'${p:.2f}$' for p in np.nanpercentile(median, [5, 16, 50, 84, 95])
+                ]
+
+                # List sigma range
+                xs = np.arange(-2, 3) * 0.15 + 0.5
+                t, a = ax.transAxes, 'center'
+                for x, label, percentile in zip(xs, labels, percentiles):
+                    ax.text(x, 0.25, label, transform=t, fontsize=13, ha=a, va=a)
+                    ax.text(x, 0.125, percentile, transform=t, fontsize=13, ha=a, va=a)
 
                 # Set title
                 if j == 0 and k == 0:
@@ -111,27 +118,45 @@ def makeFig(grism):
                     # ax.set_title(f'{filt} $(N=)$',fontsize=25,y=1.025)
 
                 # Set y-label
-                if i == 0:
-                    # label = r'$\perp$' if k else r'$\parallel$'
-                    label = 'Row' if k else 'Column'
-                    ax.set_ylabel(label)
-                else:
+                if i != 0:
                     ax.set_yticklabels([])
+                if i == 2:
+                    label = 'Row' if k else 'Column'
+                    # Set label on right side
+                    ax.set_ylabel(label)
+                    ax.yaxis.set_label_position('right')
 
                 if k != 1 or j != 1:
                     ax.set(xticklabels=[])
 
     # Create titles
-    fig.suptitle(r'\textbf{'+grism+'}', fontsize=30)
+    fig.suptitle(r'\textbf{' + grism + '}', fontsize=30)
     fig.supxlabel(r'$\textbf{Distance [px]}$', fontsize=25)
 
-    # Set labels
-    for i, label in enumerate(
-        [r'\textbf{Empirical}', r'\textbf{CRDS}', r'\textbf{Empirical $-$ CRDS}'][:2]
-    ):
+    # Set overall labels
+    ax = fig.add_subplot(gs[:, :])
+    ax.text(
+        -0.12,
+        0.5,
+        r'$\textbf{Residual (Percent of Background)}$',
+        fontsize=25,
+        ha='center',
+        va='center',
+        transform=ax.transAxes,
+        rotation=90,
+    )
+    ax.axis('off')
+    for i, label in enumerate(['Emperical', 'CRDS']):
         ax = fig.add_subplot(gs[i, 0])
         ax.text(
-            -0.52, 0.5, label, ha='center', va='center', transform=ax.transAxes, rotation=90
+            -0.2,
+            0.5,
+            label,
+            fontsize=25,
+            ha='center',
+            va='center',
+            transform=ax.transAxes,
+            rotation=90,
         )
         ax.axis('off')
 
@@ -154,4 +179,4 @@ def makeFig(grism):
 if __name__ == '__main__':
     # Iterate over grisms
     with Pool(3) as p:
-        p.map(makeFig,['CLEAR', 'GR150C', 'GR150R'])
+        p.map(makeFig, ['CLEAR', 'GR150C', 'GR150R'])

@@ -16,17 +16,20 @@ warnings.filterwarnings('ignore')
 
 # Colors
 colors = [
-    ['#FFB2FD', '#FF5AAF', '#9F0162'],
-    ['#00C2F9', '#008DF9', '#8400CD'],
     ['#FF6E3A', '#E20134', '#A40122'],
+    ['#00C2F9', '#008DF9', '#8400CD'],
+    ['#FFB2FD', '#FF5AAF', '#9F0162'],
+
 ]
+
+# Create figure
+size = 6
+fig, axes = pyplot.subplots(1, 3, figsize=(3 * size, size), sharex=True, sharey=True)
+fig.subplots_adjust(wspace=0)
 
 # Iterate over grisms
 for i, g in enumerate(['CLEAR', 'GR150C', 'GR150R']):
-    # Create figure
-    fig, ax = pyplot.subplots(1, 1, figsize=(10, 10))
-    fig.subplots_adjust(hspace=0.0, wspace=0.0)
-
+    ax = axes[i]
     # Iterate over filters
     handles = []
     for j, f in enumerate(['F115W', 'F150W', 'F200W']):
@@ -95,17 +98,19 @@ for i, g in enumerate(['CLEAR', 'GR150C', 'GR150R']):
     # Plot regions around LMC and M33
     if g == 'GR150C':
         ax.fill_between([18, 20.5], 1.4, 2.4, fc='none', ls='--', ec='gray')
-        ax.text(19.25, 1.34, 'LMC', ha='center', va='center', fontsize=20, c='gray')
+        ax.text(19.25, 1.32, 'LMC', ha='center', va='center', fontsize=20, c='gray')
     ax.fill_between([83.5, 87.5], 0, 1.425, fc='none', ls='--', ec='gray')
-    ax.text(85.5, 1.475, 'M33', ha='center', va='center', fontsize=20, c='gray')
+    ax.text(83, 1.48, 'M33', ha='center', va='center', fontsize=20, c='gray')
 
     # Set limits
     ax.set(
         xlim=[0, 90],
-        xticks=np.arange(0, 91, 10),
+        xticks=np.arange(0, 90, 10),
         xlabel='Absolute Ecliptic Latitude [deg]',
     )
-    ax.set(ylim=[0, 2.5], ylabel=r'Average Background [DN\,s$^{-1}$]', title=f'{g}')
+    if i == 0:
+        ax.set(ylim=[0, 2.5], ylabel=r'Average Background [DN\,s$^{-1}$]')
+    ax.set_title(f'{g}')
     ax.legend(
         handles=handles,
         fontsize=25,
@@ -115,6 +120,6 @@ for i, g in enumerate(['CLEAR', 'GR150C', 'GR150R']):
         handletextpad=0.1,
     )
 
-    # Save figure
-    fig.savefig(f'zodi-{g}.pdf')
+# Save figure
+fig.savefig('zodi.pdf')
 pyplot.close(fig)

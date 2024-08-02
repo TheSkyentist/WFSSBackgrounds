@@ -11,21 +11,21 @@ from matplotlib import pyplot, gridspec, colormaps as cm
 # Colormap
 cm_lin = cm.get_cmap('gray')
 cm_lin.set_bad('red')
-cm_diff = cm.get_cmap('coolwarm')
+cm_diff = cm.get_cmap('coolwarm_r')
 cm_diff.set_bad('black')
 
 # Initialize Pipeline Step
 flat_field = FlatFieldStep()
 
 for grism in ['CLEAR', 'GR150C', 'GR150R']:
-
     # Create figure
     size = 4
     fig = pyplot.figure(figsize=(3 * size, 3 * size))
+    fig.subplots_adjust(wspace=1/40, hspace=1/40)
     gs = gridspec.GridSpec(3, 3, figure=fig)
 
     # Iterate over filts
-    for i,filt in enumerate(['F115W', 'F150W', 'F200W']):
+    for i, filt in enumerate(['F115W', 'F150W', 'F200W']):
         gf = f'{grism}-{filt}'
 
         # Get products
@@ -80,7 +80,7 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
 
         # Plot
         axdiff = fig.add_subplot(gs[2, i])
-        im2 = axdiff.imshow(custom - crds, cmap=cm_diff, clim=[-0.05, 0.05])
+        im2 = axdiff.imshow((custom - crds)*100, cmap=cm_diff, clim=[-5, 5])
         axdiff.axis('off')
 
         # if i == 0:
@@ -89,7 +89,7 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
         #     axdiff.set_ylabel(r'Emperical $-$ CRDS',fontsize=25)
 
     # Create titles
-    fig.suptitle(r'\textbf{'+grism+'}', y = 0.95, fontsize=30)
+    fig.suptitle(r'\textbf{' + grism + '}', y=0.95, fontsize=30)
 
     # Set labels
     for i, label in enumerate(
@@ -109,12 +109,15 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
 
     # Create colorbars
     ax = fig.add_subplot(gs[0:2, :])
-    fig.colorbar(im1, ax=ax, shrink=0.9, aspect=20, anchor=(1.4, 0.5))
+    fig.colorbar(
+        im1, ax=ax, shrink=0.9, aspect=20, anchor=(1.4, 0.5), label='Average Background (Normalized)'
+    )
     ax.axis('off')
     ax = fig.add_subplot(gs[2, :])
-    fig.colorbar(im2, ax=ax, shrink=0.9, aspect=10, anchor=(1.4, 0.5))
+    fig.colorbar(
+        im2, ax=ax, shrink=0.9, aspect=10, anchor=(1.4, 0.5), label=r'$\Delta$ (\%)'
+    )
     ax.axis('off')
-    fig.subplots_adjust(wspace=0, hspace=0)
 
     # Save figure
     fig.savefig(f'compareBack-{grism}.pdf')
