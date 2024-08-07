@@ -24,7 +24,8 @@ flat_field = FlatFieldStep()
 
 # Grism filters
 filts = [
-    '-'.join(p) for p in product(['CLEAR','GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
+    '-'.join(p)
+    for p in product(['CLEAR', 'GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
 ]
 
 # Outside reference regions
@@ -41,6 +42,12 @@ def denoiseNsmooth(filt):
     # Find CRDS WFSS background
     ref = 'flat' if 'CLEAR' in filt else 'wfssbkg'
     wfssbkg = fits.open(flat_field.get_reference_file(f'{filt}/{p}', ref))
+
+    # Remove DATE keyword for direct
+    if 'CLEAR' in filt:
+        del wfssbkg['PRIMARY'].header['DATE']
+
+    # Get DQ array
     dq = wfssbkg['DQ'].data[nonref]
 
     # Load arrays

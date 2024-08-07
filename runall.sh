@@ -21,3 +21,4 @@ echo "Running all scripts"
 # Otherplots
 ./zodi.py # Plot the average background as a function of ecliptic latitude
 ./compareMask.py # Compare the masks on one image
+./example.py # Example of the background artefacts

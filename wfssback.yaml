@@ -7,6 +7,8 @@ dependencies:
 # - jax
 # - numpyro
 - ipython
+- pywavelets
 - pip:
+  - maskfill
   - git+https://github.com/spacetelescope/jwst.git
   - grizli[jwst] @ git+https://github.com/TheSkyentist/grizli.git@img-backsub

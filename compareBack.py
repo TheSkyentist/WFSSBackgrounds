@@ -21,7 +21,7 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
     # Create figure
     size = 4
     fig = pyplot.figure(figsize=(3 * size, 3 * size))
-    fig.subplots_adjust(wspace=1/40, hspace=1/40)
+    fig.subplots_adjust(wspace=1 / 40, hspace=1 / 40)
     gs = gridspec.GridSpec(3, 3, figure=fig)
 
     # Iterate over filts
@@ -71,7 +71,7 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
         axcustom = fig.add_subplot(gs[0, i])
         axcustom.imshow(custom, cmap=cm_lin, clim=[0.6, 1.3])
         axcustom.axis('off')
-        axcustom.set_title(f'{filt} $(N={len(tab)})$', fontsize=25)
+        axcustom.set_title(f'{filt} $(N={len(tab)})$', fontsize=25, y=1.025)
 
         # Plot
         axcrds = fig.add_subplot(gs[1, i])
@@ -80,7 +80,7 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
 
         # Plot
         axdiff = fig.add_subplot(gs[2, i])
-        im2 = axdiff.imshow((custom - crds)*100, cmap=cm_diff, clim=[-5, 5])
+        im2 = axdiff.imshow((custom - crds) * 100, cmap=cm_diff, clim=[-5, 5])
         axdiff.axis('off')
 
         # if i == 0:
@@ -110,7 +110,12 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
     # Create colorbars
     ax = fig.add_subplot(gs[0:2, :])
     fig.colorbar(
-        im1, ax=ax, shrink=0.9, aspect=20, anchor=(1.4, 0.5), label='Average Background (Normalized)'
+        im1,
+        ax=ax,
+        shrink=0.9,
+        aspect=20,
+        anchor=(1.4, 0.5),
+        label='Background',
     )
     ax.axis('off')
     ax = fig.add_subplot(gs[2, :])
