@@ -195,7 +195,7 @@ fig.legend(
             marker='o',
             ms=30,
         )
-        for i, ext in enumerate([r'\textbf{Emperical}', r'\textbf{CRDS}'])
+        for i, ext in enumerate([r'\textbf{Empirical}', r'\textbf{CRDS}'])
     ],
     loc='upper center',
     bbox_to_anchor=(0.5, 0.965),
