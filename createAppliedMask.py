@@ -54,10 +54,8 @@ def createAppliedMask(filt):
 
         # Detect
         im = hdul['SCI'].data[nonref]
-        thresh = detect_threshold(
-            im - bkg, nsigma=2, background=bkg, error=err, mask=mask
-        )
-        seg = detect_sources(im - bkg, thresh, npixels=20, connectivity=8)
+        thresh = detect_threshold(im, nsigma=1, background=bkg, error=err, mask=mask)
+        seg = detect_sources(im, thresh, npixels=20, connectivity=8)
 
         # Mask detected sources
         mask = np.logical_or(mask, seg.data > 0)
@@ -68,15 +66,16 @@ def createAppliedMask(filt):
         subbed[i] = im
 
     # Save
-    print(f'Creating source mask for {filt}')
     np.save(f'{filt}/masks.npy', masks)
     np.save(f'{filt}/subbed.npy', subbed)
+    print(f'Created source mask for {filt}')
 
     return
 
 
 if __name__ == '__main__':
     with Pool(12) as pool:
+        print('Creating masks')
         pool.imap(createAppliedMask, filts, chunksize=1)
         pool.close()
         pool.join()

@@ -21,7 +21,8 @@ flat_field = FlatFieldStep()
 
 # Grism filters
 filts = [
-    '-'.join(p) for p in product(['CLEAR','GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
+    '-'.join(p)
+    for p in product(['CLEAR', 'GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
 ]
 
 # Non reference pixels (in FULL mode)
@@ -41,7 +42,6 @@ def makeSourceMask(filt):
     masks = np.zeros(shape=(len(rate), 2040, 2040), dtype=bool)
     flatted = np.zeros(shape=(len(rate), 2040, 2040), dtype=float)
     for i, r in tqdm(enumerate(rate), total=len(rate)):
-
         # Flat-field
         dm = flat_field.call(r)
         dm.save(r.replace('.fits', '_flatfield.fits'))
@@ -58,10 +58,8 @@ def makeSourceMask(filt):
         bkg = Background(im, mask=mask).back()
 
         # Detect
-        thresh = detect_threshold(
-            im - bkg, nsigma=0.5, background=bkg, error=err, mask=mask
-        )
-        seg = detect_sources(im - bkg, thresh, npixels=3, connectivity=8)
+        thresh = detect_threshold(im, nsigma=2, background=bkg, error=err, mask=mask)
+        seg = detect_sources(im, thresh, npixels=10, connectivity=8)
 
         # Mask detected sources
         mask = np.logical_or(mask, seg.data > 0)

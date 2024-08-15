@@ -66,13 +66,7 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
             flat_file = flat_field.get_reference_file(
                 os.path.join(f'{grism}-{filt}', tab['productFilename'][0]), 'flat'
             )
-            fl = fits.getdata(flat_file)
-            bad = (fl < 0.6) | (fl > 1.3)
-            fl[bad] = 1
-            crds /= fl
-            crds /= np.nanmedian(crds)
-            bad |= ~np.isfinite(crds)
-            crds[bad] = np.nan
+            crds /= fits.getdata(flat_file)
             crds[crds_dq != 0] = np.nan
 
         # Plot

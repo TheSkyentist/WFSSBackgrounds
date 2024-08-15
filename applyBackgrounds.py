@@ -10,6 +10,7 @@ from itertools import product
 # Multiprocessing
 from multiprocessing import Pool
 from threadpoolctl import threadpool_limits
+from concurrent.futures import ThreadPoolExecutor
 
 # Astropy
 from astropy.table import Table
@@ -19,12 +20,19 @@ from grizli.prep import visit_grism_sky
 
 # List of filter grism pairs
 filts = [
-    '-'.join(p) for p in product(['CLEAR','GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
+    '-'.join(p)
+    for p in product(['CLEAR', 'GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
 ]
 
 # Number of threads
 processes = 30
 chunksize = 1
+
+
+# Copy file to destination
+def copy_file(file, dest1, dest2):
+    shutil.copy(file, dest1)
+    shutil.copy(file, dest2)
 
 
 # WFSS Background
@@ -34,7 +42,7 @@ def wfssBack(f):
     grism = {'product': os.path.basename(f).strip('.fits'), 'files': [f]}
 
     # Run
-    visit_grism_sky(grism, column_average=False, verbose=False)
+    visit_grism_sky(grism, column_average=False, verbose=False, ignoreNA=True)
 
     return
 
@@ -54,11 +62,17 @@ def applyBackgrounds(filt):
             shutil.rmtree(f'{filt}{ext}')
         os.mkdir(f'{filt}{ext}')
 
-    # Copy files to new folder
+    # Use ThreadPoolExecutor to copy files concurrently
     print(f'Copying {filt} data to new directories')
-    for f in tqdm(files):
-        shutil.copy(f, f'{filt}_crds')
-        shutil.copy(f, f'{filt}_custom')
+    with ThreadPoolExecutor() as executor:
+        list(
+            tqdm(
+                executor.map(
+                    lambda f: copy_file(f, f'{filt}_crds', f'{filt}_custom'), files
+                ),
+                total=len(files),
+            )
+        )
 
     # Get base filenames
     files = [os.path.basename(f) for f in files]
@@ -77,7 +91,10 @@ def applyBackgrounds(filt):
         wfssBack(files[0])  # Run first file so grizli can create the background
         with Pool(processes) as pool:
             _ = list(
-                tqdm(pool.imap(wfssBack, files[1:], chunksize=chunksize), total=len(files))
+                tqdm(
+                    pool.imap(wfssBack, files[1:], chunksize=chunksize),
+                    total=len(files),
+                )
             )
     os.chdir('..')
 
@@ -102,4 +119,3 @@ if __name__ == '__main__':
     # Iterate over filters
     for filt in filts:
         applyBackgrounds(filt)
-        print()
