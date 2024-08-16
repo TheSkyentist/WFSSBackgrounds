@@ -13,7 +13,7 @@ echo "Running all scripts"
 # Iterative Run
 
 # Iterate
-for i in {1..2}
+for i in {1..10}
 do 
 ./makeBackground.py # Creates the background using second round masks
 ./denoiseNsmooth.py # Smooths the background

@@ -14,7 +14,7 @@ from astropy.io import fits
 from astroquery.gaia import Gaia
 from astroquery.mast import Observations
 from astropy.coordinates import SkyCoord
-from astropy.table import Table, hstack
+from astropy.table import Table, hstack, join
 
 
 # Query from GAIA lite
@@ -66,7 +66,8 @@ if __name__ == '__main__':
 
     # Create product filter grism combos
     filts = [
-        ';'.join(p) for p in product(['CLEAR','GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
+        ';'.join(p)
+        for p in product(['CLEAR', 'GR150C', 'GR150R'], ['F115W', 'F150W', 'F200W'])
     ]
 
     # Iterate over filters and grisms
@@ -93,8 +94,14 @@ if __name__ == '__main__':
         if not os.path.isdir(filt):
             os.mkdir(filt)
 
+        # Get products that are not already downloaded
+        todo = np.setdiff1d(prods['productFilename'], os.listdir(filt))
+
         # Download products
-        Observations.download_products(prods, download_dir=filt, flat=True)
+        if len(todo) > 0:
+            Observations.download_products(
+                join(prods, Table([todo])), download_dir=filt, flat=True
+            )
 
         # Limit list to NIS and FULL
         pfiles = [f'{filt}/{f}' for f in prods['productFilename']]

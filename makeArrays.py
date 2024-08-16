@@ -4,8 +4,9 @@
 import shutil
 import numpy as np
 from tqdm import tqdm
+from os.path import isdir
 from itertools import product
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 
 # Image Processing Packages
 from sep import Background
@@ -29,11 +30,33 @@ filts = [
 nonref = (slice(4, -4), slice(4, -4))
 
 
+def makeArray(r):
+    # Flat-field
+    dm = flat_field.call(r)
+    dm.save(r.replace('.fits', '_flatfield.fits'))
+    im = dm.data[nonref].astype(np.float32)
+    err = dm.err[nonref].astype(np.float32)
+    dq = dm.dq[nonref]
+
+    # Mask data
+    mask = dq > 0
+    im[mask] = np.nan
+
+    # Rudimentary background subtraction
+    bkg = Background(im, mask=mask).back()
+
+    # Detect
+    thresh = detect_threshold(im, nsigma=2, background=bkg, error=err, mask=mask)
+    seg = detect_sources(im, thresh, npixels=10, connectivity=8)
+
+    # Mask detected sources
+    mask = np.logical_or(mask, seg.data > 0)
+
+    return im, mask
+
+
 # Define background function
 def makeSourceMask(filt):
-    for ext in ['_custom', '_crds']:
-        shutil.rmtree(f'{filt}{ext}', ignore_errors=True)
-
     # Get products
     prods = Table.read(f'{filt}/{filt}.fits')
     rate = [f'{filt}/{f}' for f in prods['productFilename']]
@@ -41,29 +64,14 @@ def makeSourceMask(filt):
     # Make arrays
     masks = np.zeros(shape=(len(rate), 2040, 2040), dtype=bool)
     flatted = np.zeros(shape=(len(rate), 2040, 2040), dtype=float)
-    for i, r in tqdm(enumerate(rate), total=len(rate)):
-        # Flat-field
-        dm = flat_field.call(r)
-        dm.save(r.replace('.fits', '_flatfield.fits'))
-        im = dm.data[nonref].astype(np.float32)
-        err = dm.err[nonref].astype(np.float32)
-        dq = dm.dq[nonref]
 
-        # Mask data
-        mask = dq > 0
-        im[mask] = np.nan
-        flatted[i] = im
-
-        # Rudimentary background subtraction
-        bkg = Background(im, mask=mask).back()
-
-        # Detect
-        thresh = detect_threshold(im, nsigma=2, background=bkg, error=err, mask=mask)
-        seg = detect_sources(im, thresh, npixels=10, connectivity=8)
-
-        # Mask detected sources
-        mask = np.logical_or(mask, seg.data > 0)
-        masks[i] = mask
+    # Multipricess
+    with Pool(processes=cpu_count()) as pool:
+        for i, (im, mask) in tqdm(
+            enumerate(pool.imap(makeArray, rate)), total=len(rate)
+        ):
+            masks[i] = mask
+            flatted[i] = im
 
     # Save mask to pickle
     np.save(f'{filt}/masks.npy', masks)
@@ -72,8 +80,18 @@ def makeSourceMask(filt):
 
 # Main function
 if __name__ == '__main__':
-    # Multiprocess
-    pool = Pool(processes=len(filts))
-    pool.map_async(makeSourceMask, filts, chunksize=1)
-    pool.close()
-    pool.join()
+    # Delete old directories
+    with Pool(processes=cpu_count()) as pool:
+        pool.map(
+            shutil.rmtree,
+            [
+                f'{filt}{ext}'
+                for filt in filts
+                for ext in ['_custom', '_crds']
+                if isdir(f'{filt}{ext}')
+            ],
+        )
+
+    for filt in filts:
+        makeSourceMask(filt)
+        print(f'Created mask for {filt}')

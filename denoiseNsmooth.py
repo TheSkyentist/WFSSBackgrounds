@@ -102,7 +102,5 @@ def denoiseNsmooth(filt):
 # Main function
 if __name__ == '__main__':
     # Multiprocess
-    pool = Pool(processes=len(filts))
-    pool.map_async(denoiseNsmooth, filts, chunksize=1)
-    pool.close()
-    pool.join()
+    with Pool(processes=len(filts)) as pool:
+        pool.map_async(denoiseNsmooth, filts, chunksize=1)

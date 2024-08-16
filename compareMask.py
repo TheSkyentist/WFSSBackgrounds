@@ -30,7 +30,7 @@ gfs, fs = (
 # Extensions
 exts = ['', '_crds', '_custom']
 titles = (
-    r'\textbf{Flat-Fielded Rate File}',
+    r'\textbf{Flat$\boldsymbol{-}$Fielded Rate File}',
     r'\textbf{CRDS Background Sub.}',
     r'\textbf{Custom Background Sub.}',
 )
@@ -86,6 +86,17 @@ for j, (gf, f) in enumerate(zip(gfs, fs)):
         if j == 0:
             axes[j, i].set_title(titles[i])
 
+    # Set labels
+    axes[j,0].text(
+        -0.05,
+        0.5,
+        gf.replace('-', '$-$'),
+        fontsize=30,
+        ha='center',
+        va='center',
+        transform=axes[j,0].transAxes,
+        rotation=90,
+    )
 
 fig.savefig('compareMask.pdf')
 pyplot.close(fig)

@@ -117,8 +117,6 @@ fig.colorbar(
     anchor=(1.55, 0.5),
     label='Percent of Background',
 )
-# Set colorbar ticks
-
 ax.axis('off')
 
 # Save figure
