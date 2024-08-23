@@ -88,7 +88,7 @@ for j, (gf, f) in enumerate(zip(gfs, fs)):
 
     # Set labels
     axes[j,0].text(
-        -0.05,
+        -0.04,
         0.5,
         gf.replace('-', '$-$'),
         fontsize=30,

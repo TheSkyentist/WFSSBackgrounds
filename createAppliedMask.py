@@ -43,7 +43,7 @@ def makeMask(file):
     # Detect
     im = hdul['SCI'].data[nonref]
     thresh = detect_threshold(im, nsigma=1, background=bkg, error=err, mask=mask)
-    seg = detect_sources(im, thresh, npixels=20, connectivity=8)
+    seg = detect_sources(im, thresh, npixels=10, connectivity=8)
 
     # Mask detected sources
     mask = np.logical_or(mask, seg.data > 0)
