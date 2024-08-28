@@ -35,7 +35,7 @@ def gquery(c, maglim=9.5, radius=1 / 30):
 
 if __name__ == '__main__':
     # Record time of query
-    time = datetime.now(timezone.utc).strftime('%Y-%M-%dT%H:%M:%S.%f')[:-3]
+    time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3]
 
     # Query all data
     all_obs = Observations.query_criteria(
