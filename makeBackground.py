@@ -54,4 +54,4 @@ if __name__ == '__main__':
 
     # Multiprocess
     with Pool(processes=len(filts)) as pool:
-        pool.map_async(makeAvgBackground,filts,chunksize=1)
+        pool.map(makeAvgBackground,filts,chunksize=1)

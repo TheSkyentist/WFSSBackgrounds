@@ -1,9 +1,11 @@
 #! /usr/bin/env python
 
 # Python Packages
+import os
 import numpy as np
 from itertools import product
 from multiprocessing import Pool
+from datetime import datetime, timezone
 
 # Image Processing Packages
 from maskfill import maskfill
@@ -15,8 +17,6 @@ from astropy.table import Table
 
 # JWST Pipeline Packages
 from jwst.flatfield import FlatFieldStep
-
-flat_field = FlatFieldStep()
 
 # Ignore RuntimeWarnings
 # import warnings
@@ -41,6 +41,7 @@ def denoiseNsmooth(filt):
 
     # Find CRDS WFSS background
     ref = 'flat' if 'CLEAR' in filt else 'wfssbkg'
+    flat_field = FlatFieldStep()
     wfssbkg = fits.open(flat_field.get_reference_file(f'{filt}/{p}', ref))
 
     # Remove DATE keyword for direct
@@ -75,27 +76,41 @@ def denoiseNsmooth(filt):
     ratehdul['SCI'].data = out
     unflat = flat_field.call(ratehdul, inverse=True).data
 
+    # Fix Header Values
+    header = wfssbkg['PRIMARY'].header
+    qdate = fits.getval(f'{filt}/{filt}.fits', 'QDATE', 'PRIMARY')
+    header['QDATE'] = qdate
+    # header['USEAFTER'] = qdate
+    for deletekey in ['HISTORY', 'PEDIGREE', 'USEAFTER']:
+        del header[deletekey]
+    header['DATE'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3]
+    header['AUTHOR'] = 'Raphael Hviding'
+    header['DATAMODL'] = 'ImgBkgModel' if 'CLEAR' in filt else 'WfssBkgModel'
+    header['REFTYPE'] = 'IMGBKG' if 'CLEAR' in filt else 'WFSSBKG'
+    header['DESCRIP'] = 'Emperical Background'
+
     # Place the unflat fielded background into HDUL
-    wfssbkg['SCI'].header['QDATE'] = fits.getval(
-        f'{filt}/{filt}.fits', 'QDATE', 'PRIMARY'
-    )
-    wfssbkg['PRIMARY'].data = unflat
+    wfssbkg['SCI'].data = unflat
 
     # Save to file
     g, f = filt.split('-')
-    wfssbkg.writeto(
-        f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat_unflat.fits',
-        overwrite=True,
-    )
+    filename = f'nis-{f.lower()}-{g.lower()}_skyflat_unflat.fits'
+    header['FILENAME'] = filename
+    wfssbkg.writeto(os.path.join('wfssbackgrounds',filename), overwrite=True)
+
+    # Reverse the flat-field on the error
+    ratehdul['SCI'].data = wfssbkg['ERR'].data
+    unflat_err = flat_field.call(ratehdul, inverse=True).data
 
     # Save the flat-fielded background
     wfssbkg['SCI'].data = out
-    wfssbkg['PRIMARY'].header['FIXFLAT'] = True
+    wfssbkg['ERR'].data = unflat_err
+    header['FIXFLAT'] = True
 
     # Save to file
-    wfssbkg.writeto(
-        f'wfssbackgrounds/nis-{f.lower()}-{g.lower()}_skyflat.fits', overwrite=True
-    )
+    filename = f'nis-{f.lower()}-{g.lower()}_skyflat.fits'
+    header['FILENAME'] = filename
+    wfssbkg.writeto(os.path.join('wfssbackgrounds',filename), overwrite=True)
     print(f'Denoised and smoothed {filt}')
 
 
@@ -103,4 +118,4 @@ def denoiseNsmooth(filt):
 if __name__ == '__main__':
     # Multiprocess
     with Pool(processes=len(filts)) as pool:
-        pool.map_async(denoiseNsmooth, filts, chunksize=1)
+        pool.map(denoiseNsmooth, filts, chunksize=1)
