@@ -2,6 +2,7 @@
 
 # Import packages
 import os
+import subprocess
 import numpy as np
 from astropy.io import fits
 from astropy.table import Table
@@ -137,5 +138,22 @@ for grism in ['CLEAR', 'GR150C', 'GR150R']:
     ax.axis('off')
 
     # Save figure
-    fig.savefig(f'compareBack-{grism}.pdf')
+    filename = f'compareBack-{grism}.pdf'
+    fig.savefig(filename)
     pyplot.close(fig)
+
+    # Ghostscript command to compress the PDF
+    compression_level = '/prepress'
+    gs_command = [
+        'gs',
+        '-sDEVICE=pdfwrite',
+        '-dCompatibilityLevel=1.4',
+        f'-dPDFSETTINGS={compression_level}',  # Compression level
+        '-dNOPAUSE',
+        '-dQUIET',
+        '-dBATCH',
+        f'-sOutputFile={filename}.gs',
+        filename,
+    ]
+    subprocess.run(gs_command)
+    os.replace(f'{filename}.gs',filename)
